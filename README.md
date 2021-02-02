@@ -44,8 +44,9 @@ Content-Length: 40
 {"id":42,"jsonrpc":"2.0","result":"0x1"}
 ```
 
-Open https://mainnet.infura.io/ in Brave browser (you should see 
-* Your connection is not private / NET::ERR_CERT_AUTHORITY_INVALID warning)
-* Click Advanced -> Proceed
+Open https://mainnet.infura.io/ in Brave browser (you should see a warning message:
+Your connection is not private / NET::ERR_CERT_AUTHORITY_INVALID)
+
+Click Advanced -> Proceed
 
 
