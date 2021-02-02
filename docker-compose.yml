@@ -1,0 +1,69 @@
+version: '3'
+
+services:
+  traefik:
+    # The official v2 Traefik docker image
+    image: traefik:v2.4
+    ports:
+      # The HTTPS port
+      # - "80:80"
+      - "443:443"
+      # The Web UI (enabled by --api.insecure=true)
+      - "8080:8080"
+    command:
+      - --providers.docker
+      - --log.level=INFO
+      - --api.dashboard=true
+      - --api.insecure=true
+        # setup dynamic config directory as /config volume
+      - --providers.file.directory=/config
+      - --providers.file.watch=true
+        # setup http entrypoint on port 80
+      - --entrypoints.web.address=:80
+        # setup https entrypoint on port 9443
+      - --entrypoints.websecure.address=:443
+      - --entrypoints.traefik.address=:8080
+
+    labels:
+      # catchall http -> https redirect
+      - traefik.http.routers.http-catchall.rule=hostregexp(`{host:.+}`)
+      - traefik.http.routers.http-catchall.entrypoints=web
+      - traefik.http.routers.http-catchall.middlewares=redirect-to-https@docker
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https
+      - traefik.http.middlewares.redirect-to-https.redirectscheme.port=443
+
+      - "traefik.enable=true"
+      # Dashboard
+      - "traefik.http.services.traefik.loadbalancer.server.port=8080"
+      - "traefik.http.routers.traefik.rule=Host(`traefik.localhost`)"
+      - "traefik.http.routers.traefik.entrypoints=web,websecure"
+    volumes:
+      # So that Traefik can listen to the Docker events
+      - /var/run/docker.sock:/var/run/docker.sock
+        # config volume from this repo as readonly
+      - ./config:/config:ro
+        # adding volume containing ssl certs
+      - ./certs:/certs:ro
+        # adding volume for log files
+      - ./logs:/logs
+  whoami:
+    image: traefik/whoami
+    container_name: whoami.localhost
+    labels:
+      - traefik.http.routers.whoami-https.entrypoints=websecure
+      - traefik.http.routers.whoami-https.tls=true
+      - traefik.http.routers.whoami-https.rule=Host(`whoami.localhost`) && PathPrefix(`/whoami`)
+      - traefik.http.middlewares.whoami-https.stripprefix.prefixes=/whoami
+      - traefik.port=80
+  ganache-cli:
+    image: trufflesuite/ganache-cli:v6.12.2
+    container_name: ganache-cli.localhost
+    # forking of alchemi.io since that supports archival nodes
+    command: --accounts 2 --defaultBalanceEther --secure -u 0 -u 1 --chainId ${CHAINID} --fork https://eth-mainnet.alchemyapi.io/v2/${ALCHEMYIO_KEY}@${BLOCKNO} --port 8545
+    labels:
+      - traefik.http.routers.infura.entrypoints=websecure
+      - traefik.http.routers.infura.tls=true
+      - traefik.http.routers.infura.rule=Host(`mainnet.infura.io`)
+      - traefik.http.middlewares.infura.stripprefixregex.regex=/v3/[^/]+
+      - traefik.port=8545
+
